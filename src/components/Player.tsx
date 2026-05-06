@@ -1,7 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, useCallback, type FormEvent } from 'react'
 import { useAudioPlayer } from '../useAudioPlayer'
 import { SeekBar } from './SeekBar'
 import { Setlist } from './Setlist'
+import { Library, type LibraryItem } from './Library'
 
 interface Props {
   backendUrl: string
@@ -24,15 +25,32 @@ export function Player({ backendUrl }: Props) {
   const [inputUrl, setInputUrl] = useState('')
   const [setlist, setSetlist] = useState<SetlistItem[]>([])
   const [setlistLoading, setSetlistLoading] = useState(false)
-  const { state, load, play, pause, seek } = useAudioPlayer(backendUrl)
+  const [library, setLibrary] = useState<LibraryItem[]>([])
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null)
+  const { state, load, loadCached, play, pause, seek } = useAudioPlayer(backendUrl)
 
-  const handleSubmit = (e: FormEvent) => {
+  const fetchLibrary = useCallback(async () => {
+    try {
+      const res = await fetch(`${backendUrl}/library`)
+      const data = await res.json()
+      setLibrary(data.items ?? [])
+    } catch {
+      // 取得失敗は無視
+    }
+  }, [backendUrl])
+
+  useEffect(() => {
+    fetchLibrary()
+  }, [fetchLibrary])
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     const trimmed = inputUrl.trim()
-    if (trimmed) {
-      setSetlist([])
-      load(trimmed)
-    }
+    if (!trimmed) return
+    setSetlist([])
+    setCurrentJobId(null)
+    await load(trimmed)
+    fetchLibrary()
   }
 
   const handleFetchSetlist = async () => {
@@ -42,7 +60,10 @@ export function Player({ backendUrl }: Props) {
     try {
       const res = await fetch(`${backendUrl}/setlist?url=${encodeURIComponent(trimmed)}`)
       const data = await res.json()
-      setSetlist(data.items ?? [])
+      const items = data.items ?? []
+      setSetlist(items)
+      // セットリストをライブラリに反映
+      if (items.length > 0) fetchLibrary()
     } catch {
       // 取得失敗は無視
     } finally {
@@ -53,6 +74,22 @@ export function Player({ backendUrl }: Props) {
   const handleSelectItem = (seconds: number) => {
     seek(seconds)
     if (!state.playing) play()
+  }
+
+  const handlePlayFromLibrary = (item: LibraryItem) => {
+    setCurrentJobId(item.job_id)
+    setSetlist(item.setlist)
+    setInputUrl(item.source_url)
+    loadCached(item.audio_url, item.title, item.duration, item.source_url)
+  }
+
+  const handleDeleteFromLibrary = async (jobId: string) => {
+    await fetch(`${backendUrl}/library/${jobId}`, { method: 'DELETE' })
+    if (jobId === currentJobId) {
+      setCurrentJobId(null)
+      setSetlist([])
+    }
+    fetchLibrary()
   }
 
   return (
@@ -142,7 +179,6 @@ export function Player({ backendUrl }: Props) {
         />
       )}
 
-      {/* セットリストなし */}
       {!setlistLoading && setlist.length === 0 && state.track && (
         <p className="text-center text-xs text-gray-600">
           セットリストが見つからない場合は概要欄にタイムスタンプがない可能性があります
@@ -154,6 +190,14 @@ export function Player({ backendUrl }: Props) {
           YouTube の URL を入力して読み込んでください
         </p>
       )}
+
+      {/* ライブラリ */}
+      <Library
+        items={library}
+        currentJobId={currentJobId}
+        onPlay={handlePlayFromLibrary}
+        onDelete={handleDeleteFromLibrary}
+      />
     </div>
   )
 }

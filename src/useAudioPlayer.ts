@@ -108,31 +108,29 @@ export function useAudioPlayer(backendUrl: string) {
 
   const play = useCallback(async () => {
     const audio = getAudio()
-    if (audio.error && state.track) {
-      setState((s) => ({ ...s, loading: true, error: null }))
-      try {
-        const track = await fetchAudioUrl(state.track.sourceUrl)
-        const savedTime = audio.currentTime
-        audio.src = track.audioUrl
-        audio.load()
-        audio.currentTime = savedTime
-        setupMediaSession(track)
-        setState((s) => ({ ...s, track, loading: false }))
-      } catch (e) {
-        setState((s) => ({
-          ...s,
-          loading: false,
-          error: e instanceof Error ? e.message : '再取得エラー',
-        }))
-        return
-      }
+    // エラー状態のときはawaitせず同期的にリロード（iOS Safari のユーザー操作コンテキストを維持するため）
+    if (audio.error) {
+      audio.load()
+      setState((s) => ({ ...s, error: null }))
     }
     try {
       await audio.play()
     } catch {
       setState((s) => ({ ...s, error: '再生できませんでした' }))
     }
-  }, [fetchAudioUrl, getAudio, setupMediaSession, state.track])
+  }, [getAudio])
+
+  const loadCached = useCallback(
+    (audioUrl: string, title: string, duration: number, sourceUrl: string) => {
+      const audio = getAudio()
+      audio.src = audioUrl
+      audio.load()
+      const track: TrackInfo = { title, duration, audioUrl, sourceUrl }
+      setState((s) => ({ ...s, track, loading: false, error: null, currentTime: 0, duration }))
+      setupMediaSession(track)
+    },
+    [getAudio, setupMediaSession],
+  )
 
   const pause = useCallback(() => {
     getAudio().pause()
@@ -180,5 +178,5 @@ export function useAudioPlayer(backendUrl: string) {
     }
   }, [getAudio])
 
-  return { state, load, play, pause, seek }
+  return { state, load, loadCached, play, pause, seek }
 }
