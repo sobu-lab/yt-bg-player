@@ -1,0 +1,14 @@
+image: node:22-alpine
+
+pages:
+  script:
+    - npm ci
+    - npm run build
+    - mv dist public
+  variables:
+    VITE_BASE_PATH: "/$CI_PROJECT_NAME/"
+  artifacts:
+    paths:
+      - public
+  only:
+    - main
