@@ -39,7 +39,7 @@ http://raspberrypi.local:8000/tunnel-url
 
 | 項目 | 内容 |
 |------|------|
-| バックエンド | FastAPI + yt-dlp (`/home/pi/main.py`) |
+| バックエンド | FastAPI + yt-dlp (`/home/pi/main.py`)、音声フォーマット: M4A(AAC) 優先 |
 | 起動管理 | systemd (`yt-bg-player.service`, `cloudflared.service`) |
 | フロントエンド | `dist/` を FastAPI の StaticFiles で配信 |
 
