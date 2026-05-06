@@ -71,31 +71,9 @@ export function Player({ backendUrl }: Props) {
           disabled={state.loading || !inputUrl.trim()}
           className="bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
         >
-          {state.loading ? '読込中…' : '読込'}
+          {state.loading ? 'ダウンロード中…' : '読込'}
         </button>
       </form>
-
-      {/* ダウンロード進捗 */}
-      {state.loading && (
-        <div className="flex flex-col gap-1.5">
-          <div className="flex justify-between text-xs text-gray-400">
-            <span>
-              {state.downloadProgress !== null
-                ? `ダウンロード中… ${state.downloadProgress}%`
-                : 'ダウンロード中…'}
-            </span>
-            {state.downloadEta !== null && (
-              <span>残り約 {state.downloadEta} 秒</span>
-            )}
-          </div>
-          <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
-            <div
-              className="bg-red-500 h-full rounded-full transition-all duration-500"
-              style={{ width: state.downloadProgress !== null ? `${state.downloadProgress}%` : '0%' }}
-            />
-          </div>
-        </div>
-      )}
 
       {/* エラー */}
       {state.error && (

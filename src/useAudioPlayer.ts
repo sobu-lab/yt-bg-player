@@ -14,8 +14,6 @@ interface AudioPlayerState {
   duration: number
   loading: boolean
   error: string | null
-  downloadProgress: number | null
-  downloadEta: number | null
 }
 
 export function useAudioPlayer(backendUrl: string) {
@@ -27,8 +25,6 @@ export function useAudioPlayer(backendUrl: string) {
     duration: 0,
     loading: false,
     error: null,
-    downloadProgress: null,
-    downloadEta: null,
   })
 
   const getAudio = useCallback(() => {
@@ -42,17 +38,13 @@ export function useAudioPlayer(backendUrl: string) {
 
   // ダウンロード完了までポーリング（2秒間隔）
   const fetchAudioUrl = useCallback(
-    async (
-      youtubeUrl: string,
-      onProgress?: (progress: number | null, eta: number | null) => void,
-    ): Promise<TrackInfo> => {
+    async (youtubeUrl: string): Promise<TrackInfo> => {
       const endpoint = `${backendUrl}/audio-url?url=${encodeURIComponent(youtubeUrl)}`
       while (true) {
         const res = await fetch(endpoint)
         if (!res.ok) throw new Error(`サーバーエラー: ${res.status}`)
         const data = await res.json()
         if (data.status === 'done') {
-          onProgress?.(null, null)
           return {
             title: data.title ?? '不明なタイトル',
             duration: data.duration ?? 0,
@@ -63,8 +55,7 @@ export function useAudioPlayer(backendUrl: string) {
         if (data.status === 'error') {
           throw new Error(data.error ?? 'ダウンロードエラー')
         }
-        // pending → 進捗更新して2秒待って再試行
-        onProgress?.(data.progress ?? null, data.eta ?? null)
+        // pending → 2秒待って再試行
         await new Promise((r) => setTimeout(r, 2000))
       }
     },
@@ -90,11 +81,9 @@ export function useAudioPlayer(backendUrl: string) {
 
   const load = useCallback(
     async (youtubeUrl: string) => {
-      setState((s) => ({ ...s, loading: true, error: null, downloadProgress: null, downloadEta: null }))
+      setState((s) => ({ ...s, loading: true, error: null }))
       try {
-        const track = await fetchAudioUrl(youtubeUrl, (progress, eta) => {
-          setState((s) => ({ ...s, downloadProgress: progress, downloadEta: eta }))
-        })
+        const track = await fetchAudioUrl(youtubeUrl)
         const audio = getAudio()
         audio.src = track.audioUrl
         audio.load()
@@ -104,8 +93,6 @@ export function useAudioPlayer(backendUrl: string) {
           loading: false,
           currentTime: 0,
           duration: track.duration,
-          downloadProgress: null,
-          downloadEta: null,
         }))
         setupMediaSession(track)
       } catch (e) {
