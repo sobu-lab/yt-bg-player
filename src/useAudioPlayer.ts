@@ -30,23 +30,33 @@ export function useAudioPlayer(backendUrl: string) {
   const getAudio = useCallback(() => {
     if (!audioRef.current) {
       audioRef.current = new Audio()
-      audioRef.current.preload = 'metadata'
+      audioRef.current.preload = 'auto'
+      audioRef.current.volume = 1.0
     }
     return audioRef.current
   }, [])
 
+  // ダウンロード完了までポーリング（2秒間隔）
   const fetchAudioUrl = useCallback(
     async (youtubeUrl: string): Promise<TrackInfo> => {
-      const res = await fetch(
-        `${backendUrl}/audio-url?url=${encodeURIComponent(youtubeUrl)}`,
-      )
-      if (!res.ok) throw new Error(`サーバーエラー: ${res.status}`)
-      const data = await res.json()
-      return {
-        title: data.title ?? '不明なタイトル',
-        duration: data.duration ?? 0,
-        audioUrl: data.url,
-        sourceUrl: youtubeUrl,
+      const endpoint = `${backendUrl}/audio-url?url=${encodeURIComponent(youtubeUrl)}`
+      while (true) {
+        const res = await fetch(endpoint)
+        if (!res.ok) throw new Error(`サーバーエラー: ${res.status}`)
+        const data = await res.json()
+        if (data.status === 'done') {
+          return {
+            title: data.title ?? '不明なタイトル',
+            duration: data.duration ?? 0,
+            audioUrl: data.url,
+            sourceUrl: youtubeUrl,
+          }
+        }
+        if (data.status === 'error') {
+          throw new Error(data.error ?? 'ダウンロードエラー')
+        }
+        // pending → 2秒待って再試行
+        await new Promise((r) => setTimeout(r, 2000))
       }
     },
     [backendUrl],
@@ -98,7 +108,6 @@ export function useAudioPlayer(backendUrl: string) {
 
   const play = useCallback(async () => {
     const audio = getAudio()
-    // expired URL → re-fetch
     if (audio.error && state.track) {
       setState((s) => ({ ...s, loading: true, error: null }))
       try {
