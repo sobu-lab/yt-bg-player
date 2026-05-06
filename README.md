@@ -1,73 +1,66 @@
-# React + TypeScript + Vite
+# YT BG Player
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+iPhone Safari で YouTube をバックグラウンド再生するための Web アプリ。  
+Raspberry Pi 上の FastAPI で音声 URL を取得し、`<audio>` タグで再生します。
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 使い方
 
-## React Compiler
+1. Cloudflare Tunnel の URL をブラウザで開く
+2. YouTube の URL を貼り付けて「読込」
+3. 再生ボタンを押す
+4. 画面を閉じてもバックグラウンドで再生が続く
+5. ロック画面のコントローラーで再生・一時停止できる
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### セットリスト機能
 
-## Expanding the ESLint configuration
+「セットリストを取得」ボタンを押すと、概要欄またはコメント欄からタイムスタンプを自動取得します。  
+曲名をタップするとその位置から再生します（コメント検索は 10〜20 秒かかる場合があります）。
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+---
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Cloudflare Tunnel URL の確認方法
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+Raspberry Pi を再起動すると URL が変わります。  
+**同じ Wi-Fi につながった状態**でブラウザから以下にアクセスしてください。
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+http://raspberrypi.local:8000/tunnel-url
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+現在の URL がリンクとして表示されるのでタップして開けます。
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+> スマートフォンが Wi-Fi に接続されていれば、外出先から帰ったときもこの手順で新しい URL を確認できます。
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+---
+
+## Raspberry Pi の構成
+
+| 項目 | 内容 |
+|------|------|
+| バックエンド | FastAPI + yt-dlp (`/home/pi/main.py`) |
+| 起動管理 | systemd (`yt-bg-player.service`, `cloudflared.service`) |
+| フロントエンド | `dist/` を FastAPI の StaticFiles で配信 |
+
+### サービスの状態確認（SSH 接続時）
+
+```bash
+sudo systemctl status yt-bg-player
+sudo systemctl status cloudflared
+```
+
+### フロントエンドを更新したとき
+
+Windows 側でビルド・転送後に再起動：
+
+```bash
+sudo systemctl restart yt-bg-player
+```
+
+### Pi 再起動後に自動起動しない場合
+
+```bash
+sudo systemctl enable yt-bg-player cloudflared
+sudo systemctl start yt-bg-player cloudflared
 ```
