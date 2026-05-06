@@ -1,9 +1,16 @@
 import { useState, type FormEvent } from 'react'
 import { useAudioPlayer } from '../useAudioPlayer'
 import { SeekBar } from './SeekBar'
+import { Setlist } from './Setlist'
 
 interface Props {
   backendUrl: string
+}
+
+interface SetlistItem {
+  seconds: number
+  label: string
+  timestamp: string
 }
 
 function formatTime(sec: number): string {
@@ -15,16 +22,41 @@ function formatTime(sec: number): string {
 
 export function Player({ backendUrl }: Props) {
   const [inputUrl, setInputUrl] = useState('')
+  const [setlist, setSetlist] = useState<SetlistItem[]>([])
+  const [setlistLoading, setSetlistLoading] = useState(false)
   const { state, load, play, pause, seek } = useAudioPlayer(backendUrl)
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     const trimmed = inputUrl.trim()
-    if (trimmed) load(trimmed)
+    if (trimmed) {
+      setSetlist([])
+      load(trimmed)
+    }
+  }
+
+  const handleFetchSetlist = async () => {
+    const trimmed = inputUrl.trim()
+    if (!trimmed) return
+    setSetlistLoading(true)
+    try {
+      const res = await fetch(`${backendUrl}/setlist?url=${encodeURIComponent(trimmed)}`)
+      const data = await res.json()
+      setSetlist(data.items ?? [])
+    } catch {
+      // 取得失敗は無視
+    } finally {
+      setSetlistLoading(false)
+    }
+  }
+
+  const handleSelectItem = (seconds: number) => {
+    seek(seconds)
+    if (!state.playing) play()
   }
 
   return (
-    <div className="flex flex-col gap-6 p-4 max-w-lg mx-auto w-full pt-8">
+    <div className="flex flex-col gap-4 p-4 max-w-lg mx-auto w-full pt-8">
       {/* URL入力 */}
       <form onSubmit={handleSubmit} className="flex gap-2">
         <input
@@ -53,25 +85,21 @@ export function Player({ backendUrl }: Props) {
       {/* プレイヤー */}
       {state.track && (
         <div className="bg-gray-900 rounded-2xl p-5 flex flex-col gap-4">
-          {/* タイトル */}
           <p className="text-base font-medium leading-snug line-clamp-2 text-white">
             {state.track.title}
           </p>
 
-          {/* シークバー */}
           <SeekBar
             currentTime={state.currentTime}
             duration={state.duration}
             onSeek={seek}
           />
 
-          {/* 時刻 */}
           <div className="flex justify-between text-xs text-gray-500 -mt-2">
             <span>{formatTime(state.currentTime)}</span>
             <span>{formatTime(state.duration)}</span>
           </div>
 
-          {/* 再生・一時停止 */}
           <div className="flex justify-center">
             <button
               onClick={state.playing ? pause : play}
@@ -94,7 +122,33 @@ export function Player({ backendUrl }: Props) {
         </div>
       )}
 
-      {/* 初期ガイド */}
+      {/* セットリスト取得ボタン */}
+      {state.track && (
+        <button
+          onClick={handleFetchSetlist}
+          disabled={setlistLoading}
+          className="text-sm text-gray-400 hover:text-white disabled:opacity-40 border border-gray-700 hover:border-gray-500 rounded-lg px-4 py-2 transition-colors"
+        >
+          {setlistLoading ? '取得中…（コメント検索あり・少し時間がかかります）' : 'セットリストを取得'}
+        </button>
+      )}
+
+      {/* セットリスト */}
+      {setlist.length > 0 && (
+        <Setlist
+          items={setlist}
+          currentTime={state.currentTime}
+          onSelect={handleSelectItem}
+        />
+      )}
+
+      {/* セットリストなし */}
+      {!setlistLoading && setlist.length === 0 && state.track && (
+        <p className="text-center text-xs text-gray-600">
+          セットリストが見つからない場合は概要欄にタイムスタンプがない可能性があります
+        </p>
+      )}
+
       {!state.track && !state.loading && (
         <p className="text-center text-sm text-gray-600 mt-4">
           YouTube の URL を入力して読み込んでください
