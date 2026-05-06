@@ -71,7 +71,7 @@ export function Player({ backendUrl }: Props) {
           disabled={state.loading || !inputUrl.trim()}
           className="bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
         >
-          {state.loading ? '読込中…' : '読込'}
+          {state.loading ? 'ダウンロード中…' : '読込'}
         </button>
       </form>
 
